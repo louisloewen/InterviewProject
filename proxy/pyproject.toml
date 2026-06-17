@@ -19,3 +19,11 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "respx>=0.23.1",
 ]
+
+[tool.pytest.ini_options]
+# auto: async test functions run without needing a per-test @mark.asyncio.
+asyncio_mode = "auto"
+# Put proxy/ on sys.path so tests import top-level modules (config, main,
+# providers.*, normalizers.*) the same way the app does at runtime.
+pythonpath = ["."]
+testpaths = ["tests"]

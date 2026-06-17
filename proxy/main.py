@@ -16,6 +16,8 @@ Docs: http://localhost:8000/docs
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from routes.employees import router as employees_router
+
 app = FastAPI(title="Employee Aggregator Proxy")
 
 # Open CORS for local frontend dev — not part of the exercise, leave as-is.
@@ -32,4 +34,5 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-# TODO(candidate): build the aggregation endpoint(s) here.
+# Aggregation endpoints (Issue #1: Atlas; more providers + auth in later issues).
+app.include_router(employees_router)

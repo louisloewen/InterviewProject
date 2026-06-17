@@ -34,6 +34,10 @@ class Settings:
     beacon_api_key: str
     cobalt_token: str
 
+    # Upstream provider base URLs. Defaulted to the local mock ports but kept in
+    # config so clients never hardcode a host — swappable per environment/test.
+    atlas_base_url: str
+
     # JWT signing config (Issue #3). Secret defaults to a dev-only value so the
     # app boots out of the box; override via .env for anything real.
     jwt_secret: str
@@ -50,6 +54,7 @@ def get_settings() -> Settings:
         atlas_api_key=os.getenv("ATLAS_API_KEY", ""),
         beacon_api_key=os.getenv("BEACON_API_KEY", ""),
         cobalt_token=os.getenv("COBALT_TOKEN", ""),
+        atlas_base_url=os.getenv("ATLAS_BASE_URL", "http://localhost:9001"),
         jwt_secret=os.getenv("JWT_SECRET", "dev-insecure-change-me"),
         jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
         jwt_expire_minutes=int(os.getenv("JWT_EXPIRE_MINUTES", "60")),
