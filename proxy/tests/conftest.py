@@ -5,6 +5,23 @@ from __future__ import annotations
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _clear_aggregator_cache():
+    """Reset the aggregator's module-level cache before each test.
+
+    The cache is a singleton, so without this, results would leak between tests.
+    Guarded so it's a no-op while the aggregator cache isn't implemented yet
+    (keeps the red phase showing each test's real failure reason).
+    """
+    try:
+        from services.aggregator import clear_cache
+
+        clear_cache()
+    except (ImportError, AttributeError):
+        pass
+    yield
+
+
 @pytest.fixture
 def raw_atlas_record() -> dict:
     """One raw Atlas record shaped exactly like the mock provider emits.
