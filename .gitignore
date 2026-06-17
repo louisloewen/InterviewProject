@@ -14,3 +14,8 @@ node_modules/
 
 # OS
 .DS_Store
+
+# Local agent/assistant tooling — not part of the deliverable
+.claude/
+.agent/
+CLAUDE.md
