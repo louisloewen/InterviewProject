@@ -6,15 +6,22 @@ list, slice the requested page, and return it with metadata.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from models import EmployeePage
+from security.auth import get_current_user
 from services.aggregator import get_all_employees
 
 router = APIRouter()
 
 
-@router.get("/employees", response_model=EmployeePage)
+# Protected: a valid Bearer token is required (Issue #3). The dependency runs
+# before the handler, so unauthenticated requests never hit the providers.
+@router.get(
+    "/employees",
+    response_model=EmployeePage,
+    dependencies=[Depends(get_current_user)],
+)
 async def list_employees(
     page: int = Query(1, ge=1, description="1-based page number"),
     per_page: int = Query(25, ge=1, le=100, description="Page size"),

@@ -16,6 +16,7 @@ Docs: http://localhost:8000/docs
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from routes.auth import router as auth_router
 from routes.employees import router as employees_router
 
 app = FastAPI(title="Employee Aggregator Proxy")
@@ -34,5 +35,7 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-# Aggregation endpoints (Issue #1: Atlas; more providers + auth in later issues).
+# Auth (Issue #3): /auth/login is public; /employees is protected by the
+# get_current_user dependency on its route. /health stays unauthenticated.
+app.include_router(auth_router)
 app.include_router(employees_router)

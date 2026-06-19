@@ -18,6 +18,10 @@ from fastapi.testclient import TestClient
 import services.aggregator as aggregator
 from config import settings
 from main import app
+from security.auth import create_access_token
+
+# /employees is auth-protected (Issue #3); authenticate all data requests.
+_AUTH_HEADERS = {"Authorization": f"Bearer {create_access_token('admin')}"}
 
 CANONICAL_FIELDS = {
     "name",
@@ -119,7 +123,9 @@ def _make_client(
         side_effect=_cobalt_responder(cobalt)
     )
     respx.route(host="testserver").pass_through()
-    return TestClient(app)
+    client = TestClient(app)
+    client.headers.update(_AUTH_HEADERS)
+    return client
 
 
 # --------------------------------------------------------------------------- #

@@ -1,10 +1,10 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+
+import { authFetch, clearToken, getToken, UnauthorizedError } from '#/lib/auth'
 
 export const Route = createFileRoute('/')({ component: Dashboard })
 
-// BFF base URL. The proxy shields the upstream providers + their credentials.
-const PROXY_URL = 'http://localhost:8000'
 const PER_PAGE = 25
 
 type Employee = {
@@ -30,19 +30,26 @@ function formatSalary(amount: number, currency: string): string {
 }
 
 function Dashboard() {
+  const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [result, setResult] = useState<EmployeePage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // No token -> not logged in. Redirect to the login page (client-side only).
+  useEffect(() => {
+    if (!getToken()) navigate({ to: '/login' })
+  }, [navigate])
+
   // Fetch runs client-side (useEffect) so we hit the proxy from the browser,
-  // not during SSR.
+  // not during SSR. authFetch attaches the bearer token; a 401 throws
+  // UnauthorizedError, which bounces us back to login.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
 
-    fetch(`${PROXY_URL}/employees?page=${page}&per_page=${PER_PAGE}`)
+    authFetch(`/employees?page=${page}&per_page=${PER_PAGE}`)
       .then((res) => {
         if (!res.ok) throw new Error(`Proxy responded ${res.status}`)
         return res.json() as Promise<EmployeePage>
@@ -51,7 +58,12 @@ function Dashboard() {
         if (!cancelled) setResult(body)
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message)
+        if (cancelled) return
+        if (err instanceof UnauthorizedError) {
+          navigate({ to: '/login' })
+        } else {
+          setError(err.message)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -60,7 +72,12 @@ function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [page])
+  }, [page, navigate])
+
+  function onLogout() {
+    clearToken()
+    navigate({ to: '/login' })
+  }
 
   const total = result?.total ?? 0
   const totalPages = total > 0 ? Math.ceil(total / PER_PAGE) : 1
@@ -69,11 +86,19 @@ function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Employee Aggregator</h1>
-          <p className="text-sm text-gray-500">
-            {total > 0 ? `${total.toLocaleString('en-US')} employees` : 'Loading…'}
-          </p>
+        <header className="mb-6 flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Employee Aggregator</h1>
+            <p className="text-sm text-gray-500">
+              {total > 0 ? `${total.toLocaleString('en-US')} employees` : 'Loading…'}
+            </p>
+          </div>
+          <button
+            onClick={onLogout}
+            className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Log out
+          </button>
         </header>
 
         {error && (

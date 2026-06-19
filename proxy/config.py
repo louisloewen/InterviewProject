@@ -59,7 +59,9 @@ def get_settings() -> Settings:
         atlas_base_url=os.getenv("ATLAS_BASE_URL", "http://localhost:9001"),
         beacon_base_url=os.getenv("BEACON_BASE_URL", "http://localhost:9002"),
         cobalt_base_url=os.getenv("COBALT_BASE_URL", "http://localhost:9003"),
-        jwt_secret=os.getenv("JWT_SECRET", "dev-insecure-change-me"),
+        # Dev fallback only — set JWT_SECRET in the environment. Kept >=32 bytes
+        # to satisfy the HMAC-SHA256 minimum key length.
+        jwt_secret=os.getenv("JWT_SECRET", "dev-only-insecure-secret-change-me-in-production"),
         jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
         jwt_expire_minutes=int(os.getenv("JWT_EXPIRE_MINUTES", "60")),
         cache_ttl_seconds=int(os.getenv("CACHE_TTL_SECONDS", "60")),
