@@ -214,3 +214,86 @@ async def test_providers_are_fetched_concurrently(monkeypatch):
     assert result == []
     # Concurrent ~= one delay; serial would be ~= 3 * delay.
     assert elapsed < delay * 2
+
+
+# --------------------------------------------------------------------------- #
+# Search & filter (Issue #4)
+# --------------------------------------------------------------------------- #
+
+
+def _atlas_full(first: str, last: str, email: str, status: str, department: str) -> dict:
+    return {
+        "id": "A",
+        "first_name": first,
+        "last_name": last,
+        "work_email": email,
+        "job_title": "Engineer",
+        "department": department,
+        "employment_status": status,
+        "annual_salary_cents": 78_000_000,
+        "currency": "MXN",
+        "hire_date": "2020-01-01",
+    }
+
+
+_FILTER_ATLAS = [
+    _atlas_full("María", "González", "maria.gonzalez@acme.com", "ACTIVE", "Engineering"),
+    _atlas_full("James", "Smith", "james.smith@acme.com", "ON_LEAVE", "Product"),
+    _atlas_full("Mario", "Rossi", "mario.rossi@acme.com", "TERMINATED", "Engineering"),
+    _atlas_full("Bob", "Jones", "developer42@acme.com", "ACTIVE", "Design"),
+]
+
+
+@respx.mock
+def test_filter_search_matches_name_or_email():
+    body = _make_client(atlas=_FILTER_ATLAS).get("/employees?search=maria&per_page=100").json()
+    assert {e["email"] for e in body["data"]} == {"maria.gonzalez@acme.com"}
+    assert body["total"] == 1  # total reflects the filtered count
+
+
+@respx.mock
+def test_filter_status():
+    body = _make_client(atlas=_FILTER_ATLAS).get("/employees?status=on_leave&per_page=100").json()
+    assert [e["name"] for e in body["data"]] == ["James Smith"]
+    assert body["total"] == 1
+
+
+@respx.mock
+def test_filter_department():
+    body = _make_client(atlas=_FILTER_ATLAS).get(
+        "/employees?department=Engineering&per_page=100"
+    ).json()
+    assert {e["name"] for e in body["data"]} == {"María González", "Mario Rossi"}
+    assert body["total"] == 2
+
+
+@respx.mock
+def test_filters_compose():
+    body = _make_client(atlas=_FILTER_ATLAS).get(
+        "/employees?search=mar&status=active&department=Engineering&per_page=100"
+    ).json()
+    assert {e["name"] for e in body["data"]} == {"María González"}
+    assert body["total"] == 1
+
+
+@respx.mock
+def test_invalid_status_returns_422():
+    resp = _make_client(atlas=_FILTER_ATLAS).get("/employees?status=bogus")
+    assert resp.status_code == 422
+
+
+@respx.mock
+def test_stats_reflect_filters():
+    client = _make_client(atlas=_FILTER_ATLAS)
+    unfiltered = client.get("/employees?per_page=100").json()
+    assert unfiltered["stats"] == {"active": 2, "on_leave": 1, "terminated": 1}
+    # Stats reflect all active filters, including status.
+    filtered = client.get("/employees?status=active&per_page=100").json()
+    assert filtered["stats"] == {"active": 2, "on_leave": 0, "terminated": 0}
+
+
+@respx.mock
+def test_departments_endpoint_returns_sorted_distinct():
+    resp = _make_client(atlas=_FILTER_ATLAS).get("/departments")
+    assert resp.status_code == 200
+    assert resp.json() == ["Design", "Engineering", "Product"]

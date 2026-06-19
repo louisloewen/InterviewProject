@@ -6,6 +6,7 @@ import { authFetch, clearToken, getToken, UnauthorizedError } from '#/lib/auth'
 export const Route = createFileRoute('/')({ component: Dashboard })
 
 const PER_PAGE = 25
+const SEARCH_DEBOUNCE_MS = 300
 
 type Employee = {
   name: string
@@ -18,11 +19,18 @@ type Employee = {
   hire_date: string
 }
 
+type EmployeeStats = {
+  active: number
+  on_leave: number
+  terminated: number
+}
+
 type EmployeePage = {
   data: Employee[]
   total: number
   page: number
   per_page: number
+  stats: EmployeeStats
 }
 
 function formatSalary(amount: number, currency: string): string {
@@ -32,6 +40,11 @@ function formatSalary(amount: number, currency: string): string {
 function Dashboard() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('') // debounced value actually queried
+  const [status, setStatus] = useState('')
+  const [department, setDepartment] = useState('')
+  const [departments, setDepartments] = useState<string[]>([])
   const [result, setResult] = useState<EmployeePage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -41,15 +54,39 @@ function Dashboard() {
     if (!getToken()) navigate({ to: '/login' })
   }, [navigate])
 
-  // Fetch runs client-side (useEffect) so we hit the proxy from the browser,
-  // not during SSR. authFetch attaches the bearer token; a 401 throws
-  // UnauthorizedError, which bounces us back to login.
+  // Debounce the search box: commit the typed value (and reset to page 1) only
+  // after the user pauses, so we don't fire a request per keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput)
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  // Populate the department dropdown once from the full (unfiltered) set.
+  useEffect(() => {
+    authFetch('/departments')
+      .then((res) => (res.ok ? (res.json() as Promise<string[]>) : []))
+      .then(setDepartments)
+      .catch(() => {
+        // Non-critical; the main fetch handles auth redirects.
+      })
+  }, [])
+
+  // Fetch the (filtered, paginated) page. authFetch attaches the bearer token;
+  // a 401 throws UnauthorizedError, which bounces us back to login.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
 
-    authFetch(`/employees?page=${page}&per_page=${PER_PAGE}`)
+    const params = new URLSearchParams({ page: String(page), per_page: String(PER_PAGE) })
+    if (search) params.set('search', search)
+    if (status) params.set('status', status)
+    if (department) params.set('department', department)
+
+    authFetch(`/employees?${params.toString()}`)
       .then((res) => {
         if (!res.ok) throw new Error(`Proxy responded ${res.status}`)
         return res.json() as Promise<EmployeePage>
@@ -72,7 +109,17 @@ function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [page, navigate])
+  }, [page, search, status, department, navigate])
+
+  // Filter changes reset to page 1 so you never land past the filtered range.
+  function onStatusChange(value: string) {
+    setStatus(value)
+    setPage(1)
+  }
+  function onDepartmentChange(value: string) {
+    setDepartment(value)
+    setPage(1)
+  }
 
   function onLogout() {
     clearToken()
@@ -82,6 +129,14 @@ function Dashboard() {
   const total = result?.total ?? 0
   const totalPages = total > 0 ? Math.ceil(total / PER_PAGE) : 1
   const employees = result?.data ?? []
+  const stats = result?.stats
+
+  const cards = [
+    { label: 'Total', value: total },
+    { label: 'Active', value: stats?.active ?? 0 },
+    { label: 'On Leave', value: stats?.on_leave ?? 0 },
+    { label: 'Terminated', value: stats?.terminated ?? 0 },
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -100,6 +155,51 @@ function Dashboard() {
             Log out
           </button>
         </header>
+
+        {/* Summary stat cards (reflect the filtered set). */}
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {cards.map((c) => (
+            <div key={c.label} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <p className="text-xs uppercase tracking-wide text-gray-500">{c.label}</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">
+                {c.value.toLocaleString('en-US')}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Search + filters. */}
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search name or email…"
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none sm:flex-1"
+          />
+          <select
+            value={status}
+            onChange={(e) => onStatusChange(e.target.value)}
+            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          >
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="on_leave">On Leave</option>
+            <option value="terminated">Terminated</option>
+          </select>
+          <select
+            value={department}
+            onChange={(e) => onDepartmentChange(e.target.value)}
+            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          >
+            <option value="">All departments</option>
+            {departments.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {error && (
           <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
