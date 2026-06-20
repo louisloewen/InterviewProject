@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import httpx
 
+from security.logging_config import get_security_logger
+
+logger = get_security_logger()
+
 # Request the max page size to minimize round-trips while still exercising the
 # cursor loop. Injectable so tests can force multi-page traversal.
 COBALT_PAGE_SIZE = 100
@@ -33,13 +37,18 @@ async def fetch_cobalt_people(
             body: dict = {"limit": page_size}
             if cursor is not None:
                 body["cursor"] = cursor
-            response = await client.post(
-                f"{base_url}/api/directory/search",
-                json=body,
-                # Auth: Cobalt expects an Authorization: Bearer <token> header.
-                headers={"Authorization": f"Bearer {token}"},
-            )
-            response.raise_for_status()
+            try:
+                response = await client.post(
+                    f"{base_url}/api/directory/search",
+                    json=body,
+                    # Auth: Cobalt expects an Authorization: Bearer <token> header.
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                response.raise_for_status()
+            except httpx.HTTPError as exc:
+                # OWASP API9: log provider connectivity issues server-side.
+                logger.error("Cobalt provider fetch failed: %s", exc)
+                raise
             data = response.json()
             records.extend(data["results"])
 

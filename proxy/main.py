@@ -1,13 +1,9 @@
-"""Proxy (BFF) — STARTER SKELETON.
+"""Proxy (BFF) — application entrypoint.
 
-This is intentionally almost empty. Your task is to turn this into a proxy that:
-  1. fetches employees from the three Provider APIs,
-  2. normalizes each Provider's shape into one canonical Employee model you design,
-  3. resolves duplicate people that appear across Providers and merges them,
-  4. exposes the result to the frontend.
-
-See the top-level README.md for the Provider URLs and credentials. Structure the
-code however you think is best — there are no required files or function names.
+Fetches employees from three Provider APIs, normalizes + deduplicates them, and
+exposes a paginated, searchable, JWT-protected API to the frontend. Security
+hardening (rate limiting, sanitized errors, security logging) lives in
+``security/`` and is wired up here.
 
 Run:  uv run uvicorn main:app --port 8000 --reload
 Docs: http://localhost:8000/docs
@@ -15,13 +11,29 @@ Docs: http://localhost:8000/docs
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.middleware import SlowAPIMiddleware
 
 from routes.auth import router as auth_router
 from routes.employees import router as employees_router
+from security.errors import register_error_handlers
+from security.logging_config import configure_logging
+from security.rate_limit import limiter
+
+configure_logging()
 
 app = FastAPI(title="Employee Aggregator Proxy")
 
-# Open CORS for local frontend dev — not part of the exercise, leave as-is.
+# Rate limiting (OWASP API4): default limit applies to every endpoint via the
+# middleware; /auth/login adds a stricter cap. Handlers below return 429s in the
+# structured error shape.
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+
+# Structured, sanitized error responses (OWASP API7) + security logging (API9).
+register_error_handlers(app)
+
+# Open CORS for local frontend dev — added last so it wraps all responses
+# (including 429/500). Not part of the exercise, leave as-is.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import httpx
 
+from security.logging_config import get_security_logger
+
+logger = get_security_logger()
+
 # Atlas defaults to per_page=2 (to force pagination handling). We request the
 # max page size to minimize round-trips (~12 requests for ~1,200 records instead
 # of ~600) while still exercising the traversal loop.
@@ -36,13 +40,19 @@ async def fetch_atlas_employees(
         records: list[dict] = []
         page = 1
         while True:
-            response = await client.get(
-                f"{base_url}/v1/employees",
-                params={"page": page, "per_page": page_size},
-                # Auth: Atlas expects the key in the X-API-Key header.
-                headers={"X-API-Key": api_key},
-            )
-            response.raise_for_status()
+            try:
+                response = await client.get(
+                    f"{base_url}/v1/employees",
+                    params={"page": page, "per_page": page_size},
+                    # Auth: Atlas expects the key in the X-API-Key header.
+                    headers={"X-API-Key": api_key},
+                )
+                response.raise_for_status()
+            except httpx.HTTPError as exc:
+                # OWASP API9: log provider connectivity issues; the generic
+                # handler sanitizes the client-facing response (API7).
+                logger.error("Atlas provider fetch failed (page %s): %s", page, exc)
+                raise
             body = response.json()
             records.extend(body["data"])
 

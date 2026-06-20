@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import httpx
 
+from security.logging_config import get_security_logger
+
+logger = get_security_logger()
+
 _TIMEOUT = httpx.Timeout(10.0)
 
 
@@ -21,12 +25,17 @@ async def fetch_beacon_staff(
     owns_client = client is None
     client = client or httpx.AsyncClient(timeout=_TIMEOUT)
     try:
-        response = await client.get(
-            f"{base_url}/staff",
-            # Auth: Beacon expects the key as the api_key query parameter.
-            params={"api_key": api_key},
-        )
-        response.raise_for_status()
+        try:
+            response = await client.get(
+                f"{base_url}/staff",
+                # Auth: Beacon expects the key as the api_key query parameter.
+                params={"api_key": api_key},
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            # OWASP API9: log provider connectivity issues server-side.
+            logger.error("Beacon provider fetch failed: %s", exc)
+            raise
         return response.json()  # bare JSON array, no envelope
     finally:
         if owns_client:

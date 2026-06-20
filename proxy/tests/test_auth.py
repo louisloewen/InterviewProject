@@ -72,7 +72,10 @@ def test_login_valid_returns_bearer_token():
 def test_login_invalid_returns_401_structured():
     resp = client.post("/auth/login", json={"username": "admin", "password": "wrong"})
     assert resp.status_code == 401
-    assert isinstance(resp.json(), dict)  # structured JSON, not a bare string
+    body = resp.json()
+    # Issue #5: consistent {"error","code"} shape.
+    assert "error" in body
+    assert "code" in body
 
 
 # --------------------------------------------------------------------------- #

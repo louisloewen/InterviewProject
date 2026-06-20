@@ -49,6 +49,10 @@ class Settings:
     # Aggregation cache TTL in seconds (Issue #2).
     cache_ttl_seconds: int
 
+    # Rate limits (Issue #5). Env-overridable so ops can tune without code changes.
+    rate_limit_default: str  # applies to all endpoints (OWASP API4)
+    rate_limit_login: str  # stricter, anti-brute-force on /auth/login (OWASP API2)
+
 
 def get_settings() -> Settings:
     """Build a Settings snapshot from the current environment."""
@@ -65,6 +69,8 @@ def get_settings() -> Settings:
         jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
         jwt_expire_minutes=int(os.getenv("JWT_EXPIRE_MINUTES", "60")),
         cache_ttl_seconds=int(os.getenv("CACHE_TTL_SECONDS", "60")),
+        rate_limit_default=os.getenv("RATE_LIMIT_DEFAULT", "60/minute"),
+        rate_limit_login=os.getenv("RATE_LIMIT_LOGIN", "5/minute"),
     )
 
 

@@ -22,6 +22,24 @@ def _clear_aggregator_cache():
     yield
 
 
+@pytest.fixture(autouse=True)
+def _disable_rate_limiter():
+    """Disable rate limiting for normal tests.
+
+    The limiter holds per-process counters that would otherwise leak across tests
+    (a 60/min cap on /employees could spuriously 429 mid-suite). Tests that
+    actually exercise rate limiting re-enable it and reset storage themselves.
+    Guarded so it's a no-op while rate_limit isn't implemented yet.
+    """
+    try:
+        from security.rate_limit import limiter
+
+        limiter.enabled = False
+    except (ImportError, AttributeError):
+        pass
+    yield
+
+
 @pytest.fixture
 def raw_atlas_record() -> dict:
     """One raw Atlas record shaped exactly like the mock provider emits.
