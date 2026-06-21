@@ -1,6 +1,9 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import { Sidebar } from '#/components/Sidebar'
+import { StatusBadge } from '#/components/StatusBadge'
 import { authFetch, clearToken, getToken, UnauthorizedError } from '#/lib/auth'
 
 export const Route = createFileRoute('/')({ component: Dashboard })
@@ -132,35 +135,37 @@ function Dashboard() {
   const stats = result?.stats
 
   const cards = [
-    { label: 'Total', value: total },
-    { label: 'Active', value: stats?.active ?? 0 },
-    { label: 'On Leave', value: stats?.on_leave ?? 0 },
-    { label: 'Terminated', value: stats?.terminated ?? 0 },
+    { label: 'Total', value: total, accent: 'border-emerald-500' },
+    { label: 'Active', value: stats?.active ?? 0, accent: 'border-emerald-400' },
+    { label: 'On Leave', value: stats?.on_leave ?? 0, accent: 'border-amber-400' },
+    { label: 'Terminated', value: stats?.terminated ?? 0, accent: 'border-red-400' },
   ]
 
+  const selectCls =
+    'rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none'
+
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="mx-auto max-w-6xl">
-        <header className="mb-6 flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Employee Aggregator</h1>
-            <p className="text-sm text-gray-500">
-              {total > 0 ? `${total.toLocaleString('en-US')} employees` : 'Loading…'}
-            </p>
-          </div>
-          <button
-            onClick={onLogout}
-            className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Log out
-          </button>
+    <div className="flex min-h-screen bg-gray-50 text-gray-900">
+      <Sidebar onLogout={onLogout} />
+
+      <main className="flex-1 overflow-x-hidden p-6 lg:p-8">
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Employee Aggregator</h1>
+          <p className="text-sm text-gray-500">
+            {total > 0 ? `${total.toLocaleString('en-US')} employees` : 'Loading…'}
+          </p>
         </header>
 
         {/* Summary stat cards (reflect the filtered set). */}
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {cards.map((c) => (
-            <div key={c.label} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-gray-500">{c.label}</p>
+            <div
+              key={c.label}
+              className={`rounded-xl border-l-4 ${c.accent} bg-white p-4 shadow-sm`}
+            >
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                {c.label}
+              </p>
               <p className="mt-1 text-2xl font-bold text-gray-900">
                 {c.value.toLocaleString('en-US')}
               </p>
@@ -170,18 +175,17 @@ function Dashboard() {
 
         {/* Search + filters. */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row">
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search name or email…"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none sm:flex-1"
-          />
-          <select
-            value={status}
-            onChange={(e) => onStatusChange(e.target.value)}
-            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-          >
+          <div className="relative w-full sm:flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search name or email…"
+              className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
+            />
+          </div>
+          <select value={status} onChange={(e) => onStatusChange(e.target.value)} className={selectCls}>
             <option value="">All statuses</option>
             <option value="active">Active</option>
             <option value="on_leave">On Leave</option>
@@ -190,7 +194,7 @@ function Dashboard() {
           <select
             value={department}
             onChange={(e) => onDepartmentChange(e.target.value)}
-            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className={selectCls}
           >
             <option value="">All departments</option>
             {departments.map((d) => (
@@ -202,61 +206,69 @@ function Dashboard() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             Failed to load employees: {error}
           </div>
         )}
 
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-100 text-xs uppercase tracking-wide text-gray-600">
-              <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Department</th>
-                <th className="px-4 py-3">Role</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Salary</th>
-                <th className="px-4 py-3">Hire Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
-                    Loading…
-                  </td>
+                  <th className="px-4 py-3 font-medium">Name</th>
+                  <th className="px-4 py-3 font-medium">Email</th>
+                  <th className="px-4 py-3 font-medium">Department</th>
+                  <th className="px-4 py-3 font-medium">Role</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Salary</th>
+                  <th className="px-4 py-3 font-medium">Hire Date</th>
                 </tr>
-              ) : employees.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
-                    No employees found.
-                  </td>
-                </tr>
-              ) : (
-                employees.map((emp) => (
-                  <tr key={emp.email} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
-                    <td className="px-4 py-3 text-gray-600">{emp.email}</td>
-                    <td className="px-4 py-3 text-gray-600">{emp.department}</td>
-                    <td className="px-4 py-3 text-gray-600">{emp.role}</td>
-                    <td className="px-4 py-3 text-gray-600">{emp.status}</td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {formatSalary(emp.annual_salary, emp.currency)}
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      {Array.from({ length: 7 }).map((__, j) => (
+                        <td key={j} className="px-4 py-3">
+                          <div className="h-3 rounded bg-gray-200" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : employees.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                      No employees found.
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{emp.hire_date}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  employees.map((emp) => (
+                    <tr key={emp.email} className="transition-colors hover:bg-emerald-50/40">
+                      <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
+                      <td className="px-4 py-3 text-gray-600">{emp.email}</td>
+                      <td className="px-4 py-3 text-gray-600">{emp.department}</td>
+                      <td className="px-4 py-3 text-gray-600">{emp.role}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={emp.status} />
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {formatSalary(emp.annual_salary, emp.currency)}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{emp.hire_date}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="mt-4 flex items-center justify-between">
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1 || loading}
-            className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Previous
           </button>
@@ -266,12 +278,12 @@ function Dashboard() {
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages || loading}
-            className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Next
           </button>
         </div>
-      </div>
+      </main>
     </div>
   )
 }
